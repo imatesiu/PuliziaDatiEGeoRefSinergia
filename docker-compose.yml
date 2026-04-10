@@ -1,0 +1,10 @@
+services:
+  pulizia-dati-sinergia:
+    build: .
+    container_name: pulizia-dati-sinergia
+    ports:
+      - "9382:8000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+    restart: unless-stopped

@@ -52,6 +52,38 @@ Poi apri nel browser:
 http://127.0.0.1:8000
 ```
 
+## Avvio con Docker
+
+### Build immagine
+
+```bash
+docker build -t pulizia-dati-sinergia:1.1.1 .
+```
+
+### Avvio container
+
+```bash
+docker run --rm -p 9382:8000 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.1.1
+```
+
+Poi apri nel browser:
+
+```text
+http://127.0.0.1:9382
+```
+
+### Avvio con Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Anche in questo caso l'app sarà disponibile su:
+
+```text
+http://127.0.0.1:9382
+```
+
 ## File principali
 
 - [app.py](/Users/spagnolo/github/PuliziaDatiSinergia/app.py): entrypoint Flask della web app
@@ -60,6 +92,10 @@ http://127.0.0.1:8000
 - [analyze_georef_excel.py](/Users/spagnolo/github/PuliziaDatiSinergia/analyze_georef_excel.py): script CLI per sola analisi
 - [geocode_valid_addresses_osm.py](/Users/spagnolo/github/PuliziaDatiSinergia/geocode_valid_addresses_osm.py): script CLI per geocoding
 - [app_version.py](/Users/spagnolo/github/PuliziaDatiSinergia/app_version.py): nome e versione ufficiale dell'app
+- [requirements.txt](/Users/spagnolo/github/PuliziaDatiSinergia/requirements.txt): dipendenze Python
+- [Dockerfile](/Users/spagnolo/github/PuliziaDatiSinergia/Dockerfile): immagine Docker della web app
+- [docker-compose.yml](/Users/spagnolo/github/PuliziaDatiSinergia/docker-compose.yml): avvio rapido containerizzato
+- [.dockerignore](/Users/spagnolo/github/PuliziaDatiSinergia/.dockerignore): esclusioni dal contesto Docker
 
 ## Versione applicazione
 
@@ -70,7 +106,7 @@ La versione corrente è definita in:
 Valori attuali:
 
 - `APP_NAME = "Pulizia Dati Sinergia"`
-- `APP_VERSION = "1.0.0"`
+- `APP_VERSION = "1.1.1"`
 
 ## Regola di manutenzione
 
@@ -88,3 +124,4 @@ Questo serve a mantenere coerenti:
 - Per il geocoding reale è consigliato inserire un'email nel form.
 - È disponibile anche la modalità `dry run`, che genera gli output senza chiamare il geocoder.
 - Se il file contiene molti indirizzi, l'elaborazione può richiedere tempo a causa del rate limit del servizio.
+- Il container Docker deve avere accesso a internet per poter interrogare Nominatim durante il geocoding reale.

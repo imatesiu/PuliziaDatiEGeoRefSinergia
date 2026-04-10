@@ -4,4 +4,4 @@ Aggiornare sempre APP_VERSION a ogni rilascio o modifica distribuita della web a
 """
 
 APP_NAME = "Pulizia Dati Sinergia"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.1"
