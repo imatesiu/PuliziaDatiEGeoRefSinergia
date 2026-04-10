@@ -10,6 +10,7 @@ from pathlib import Path
 from flask import Flask, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
+from app_version import APP_NAME, APP_VERSION
 from georef_pipeline import copy_input_to_output, run_full_pipeline
 
 
@@ -43,7 +44,12 @@ def to_jsonable(value):
 
 
 def render_home(error: str | None = None) -> str:
-    return render_template("index.html", error=error)
+    return render_template(
+        "index.html",
+        error=error,
+        app_name=APP_NAME,
+        app_version=APP_VERSION,
+    )
 
 
 @app.get("/")
@@ -83,6 +89,8 @@ def process_upload():
 
         copy_input_to_output(input_path, output_dir)
         manifest = {
+            "app_name": APP_NAME,
+            "app_version": APP_VERSION,
             "input_file": input_path.name,
             "dry_run": dry_run,
             "analysis": {

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Pulizia Dati Sinergia</title>
+    <title>{{ app_name }} v{{ app_version }}</title>
     <style>
       :root {
         --bg: #f5efe6;
@@ -202,7 +202,7 @@
   <body>
     <main class="shell">
       <section class="hero">
-        <span class="kicker">Georeferenziazione Assistita</span>
+        <span class="kicker">{{ app_name }} v{{ app_version }}</span>
         <h1>Carica il file, scarica lo ZIP con i risultati.</h1>
         <p class="subtitle">
           L'app analizza il file di partenza, separa i record in validi, da verificare e scarti,
@@ -253,6 +253,10 @@
           <div class="note">
             Il geocoding usa Nominatim di OpenStreetMap con cache locale e limitazione delle richieste.
             Se il file contiene molti indirizzi, l'elaborazione può richiedere un po' di tempo.
+          </div>
+
+          <div class="note">
+            Versione applicazione: <strong>{{ app_version }}</strong>
           </div>
         </aside>
       </section>
