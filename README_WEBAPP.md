@@ -59,6 +59,11 @@ La configurazione Docker è predisposta per HTTPS usando:
 - [tls/fullchain.pem](/Users/spagnolo/github/PuliziaDatiSinergia/tls/fullchain.pem)
 - [tls/privkey.pem](/Users/spagnolo/github/PuliziaDatiSinergia/tls/privkey.pem)
 
+Di default il container cerca i certificati nella cartella `tls` del progetto, tramite questi path interni:
+
+- `/app/tls/fullchain.pem`
+- `/app/tls/privkey.pem`
+
 ### Avvio rapido con script
 
 ```bash
@@ -70,17 +75,25 @@ Lo script:
 - rimuove un eventuale container precedente con lo stesso nome
 - esegue la build dell'immagine Docker aggiornata
 - avvia il container HTTPS sulla porta esterna `9382`
+- monta `/etc/letsencrypt` dal server host in sola lettura
+- usa in produzione i certificati in `/etc/letsencrypt/live/rtapp.isti.cnr.it/`
+
+Nota importante:
+
+- lo script monta l'intera cartella `/etc/letsencrypt` e non solo `live/rtapp.isti.cnr.it/`
+- questo serve perché `fullchain.pem` e `privkey.pem` in `live/` sono spesso link simbolici verso `archive/`
+- montare solo la cartella `live/...` potrebbe rompere la risoluzione dei link
 
 ### Build immagine
 
 ```bash
-docker build -t pulizia-dati-sinergia:1.2.1 .
+docker build -t pulizia-dati-sinergia:1.2.2 .
 ```
 
 ### Avvio container
 
 ```bash
-docker run --rm -p 9382:8443 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.2.1
+docker run --rm -p 9382:8443 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.2.2
 ```
 
 Poi apri nel browser:
@@ -138,7 +151,7 @@ La versione corrente è definita in:
 Valori attuali:
 
 - `APP_NAME = "Pulizia Dati Sinergia"`
-- `APP_VERSION = "1.2.1"`
+- `APP_VERSION = "1.2.2"`
 
 ## Regola di manutenzione
 
@@ -158,3 +171,4 @@ Questo serve a mantenere coerenti:
 - Se il file contiene molti indirizzi, l'elaborazione può richiedere tempo a causa del rate limit del servizio.
 - Il container Docker deve avere accesso a internet per poter interrogare Nominatim durante il geocoding reale.
 - Con certificati autofirmati o non riconosciuti dal sistema, il browser potrebbe mostrare un avviso HTTPS alla prima apertura.
+- In produzione `run_docker.sh` usa i certificati LetsEncrypt presenti sotto `/etc/letsencrypt/live/rtapp.isti.cnr.it/`.
