@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pulizia Dati Sinergia</title>
+    <style>
+      :root {
+        --bg: #f5efe6;
+        --panel: rgba(255, 252, 247, 0.92);
+        --ink: #16211d;
+        --muted: #53635d;
+        --accent: #c85b36;
+        --accent-dark: #8f371f;
+        --line: rgba(22, 33, 29, 0.12);
+        --shadow: 0 24px 60px rgba(59, 46, 32, 0.16);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(200, 91, 54, 0.18), transparent 32%),
+          radial-gradient(circle at bottom right, rgba(49, 107, 90, 0.16), transparent 28%),
+          linear-gradient(135deg, #efe4d2 0%, #f8f4ee 42%, #e8efe7 100%);
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      .shell {
+        width: min(880px, 100%);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .hero {
+        padding: 40px 40px 24px;
+        border-bottom: 1px solid var(--line);
+        background:
+          linear-gradient(120deg, rgba(200, 91, 54, 0.12), rgba(200, 91, 54, 0) 44%),
+          linear-gradient(300deg, rgba(49, 107, 90, 0.12), rgba(49, 107, 90, 0) 40%);
+      }
+
+      .kicker {
+        display: inline-block;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(22, 33, 29, 0.06);
+        color: var(--muted);
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 18px 0 10px;
+        font-size: clamp(2rem, 4vw, 3.4rem);
+        line-height: 0.96;
+        letter-spacing: -0.04em;
+      }
+
+      .subtitle {
+        margin: 0;
+        max-width: 60ch;
+        font-size: 1.05rem;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+
+      .content {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 0;
+      }
+
+      .form-pane,
+      .info-pane {
+        padding: 32px 40px 40px;
+      }
+
+      .info-pane {
+        border-left: 1px solid var(--line);
+        background: rgba(22, 33, 29, 0.03);
+      }
+
+      label {
+        display: block;
+        margin-bottom: 10px;
+        font-weight: 600;
+      }
+
+      input[type="file"],
+      input[type="email"] {
+        width: 100%;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(22, 33, 29, 0.16);
+        background: #fffdf9;
+        font: inherit;
+      }
+
+      .field {
+        margin-bottom: 22px;
+      }
+
+      .hint {
+        margin-top: 8px;
+        font-size: 0.92rem;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: rgba(22, 33, 29, 0.04);
+      }
+
+      .toggle input {
+        width: 18px;
+        height: 18px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 18px;
+        padding: 16px 22px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        width: 100%;
+        box-shadow: 0 14px 26px rgba(143, 55, 31, 0.24);
+      }
+
+      button:hover {
+        filter: brightness(1.03);
+      }
+
+      .error {
+        margin-bottom: 18px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: rgba(200, 91, 54, 0.12);
+        color: #7b2e18;
+      }
+
+      .info-pane h2 {
+        margin-top: 0;
+        font-size: 1.1rem;
+      }
+
+      ul {
+        margin: 14px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .note {
+        margin-top: 26px;
+        padding-top: 22px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.94rem;
+        line-height: 1.6;
+      }
+
+      @media (max-width: 860px) {
+        .content {
+          grid-template-columns: 1fr;
+        }
+
+        .info-pane {
+          border-left: 0;
+          border-top: 1px solid var(--line);
+        }
+
+        .hero,
+        .form-pane,
+        .info-pane {
+          padding-left: 24px;
+          padding-right: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <span class="kicker">Georeferenziazione Assistita</span>
+        <h1>Carica il file, scarica lo ZIP con i risultati.</h1>
+        <p class="subtitle">
+          L'app analizza il file di partenza, separa i record in validi, da verificare e scarti,
+          geocodifica i validi tramite OpenStreetMap e restituisce tutto in un archivio pronto da aprire.
+        </p>
+      </section>
+
+      <section class="content">
+        <div class="form-pane">
+          {% if error %}
+          <div class="error">{{ error }}</div>
+          {% endif %}
+
+          <form method="post" action="/process" enctype="multipart/form-data">
+            <div class="field">
+              <label for="source_file">File di input</label>
+              <input id="source_file" name="source_file" type="file" accept=".xlsx,.xlsm,.csv" required>
+              <div class="hint">Formati accettati: Excel `.xlsx` / `.xlsm` oppure `.csv`.</div>
+            </div>
+
+            <div class="field">
+              <label for="email">Email per Nominatim</label>
+              <input id="email" name="email" type="email" placeholder="nome@dominio.it">
+              <div class="hint">
+                Facoltativa ma consigliata quando fai geocoding reale su OpenStreetMap.
+              </div>
+            </div>
+
+            <div class="field toggle">
+              <input id="dry_run" name="dry_run" type="checkbox">
+              <label for="dry_run">Dry run: genera gli output senza chiamare il geocoder</label>
+            </div>
+
+            <button type="submit">Elabora e Scarica ZIP</button>
+          </form>
+        </div>
+
+        <aside class="info-pane">
+          <h2>Cosa trovi nello ZIP</h2>
+          <ul>
+            <li>Report testuale di sintesi</li>
+            <li>CSV `validi`, `da_verificare`, `scarti`</li>
+            <li>CSV `validi_geocoded` con `X` e `Y`</li>
+            <li>JSON con analisi strutturata e manifest del job</li>
+            <li>Una copia del file originale caricato</li>
+          </ul>
+
+          <div class="note">
+            Il geocoding usa Nominatim di OpenStreetMap con cache locale e limitazione delle richieste.
+            Se il file contiene molti indirizzi, l'elaborazione può richiedere un po' di tempo.
+          </div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>
