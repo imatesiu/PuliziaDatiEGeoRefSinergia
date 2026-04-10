@@ -3,8 +3,11 @@ services:
     build: .
     container_name: pulizia-dati-sinergia
     ports:
-      - "9382:8000"
+      - "9382:8443"
     environment:
       HOST: 0.0.0.0
-      PORT: 8000
+      PORT: 8443
+      TLS_ENABLED: "true"
+      TLS_CERT_FILE: /app/tls/fullchain.pem
+      TLS_KEY_FILE: /app/tls/privkey.pem
     restart: unless-stopped

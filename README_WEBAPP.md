@@ -54,22 +54,39 @@ http://127.0.0.1:8000
 
 ## Avvio con Docker
 
+La configurazione Docker è predisposta per HTTPS usando:
+
+- [tls/fullchain.pem](/Users/spagnolo/github/PuliziaDatiSinergia/tls/fullchain.pem)
+- [tls/privkey.pem](/Users/spagnolo/github/PuliziaDatiSinergia/tls/privkey.pem)
+
+### Avvio rapido con script
+
+```bash
+./run_docker.sh
+```
+
+Lo script:
+
+- rimuove un eventuale container precedente con lo stesso nome
+- esegue la build dell'immagine Docker aggiornata
+- avvia il container HTTPS sulla porta esterna `9382`
+
 ### Build immagine
 
 ```bash
-docker build -t pulizia-dati-sinergia:1.1.1 .
+docker build -t pulizia-dati-sinergia:1.2.1 .
 ```
 
 ### Avvio container
 
 ```bash
-docker run --rm -p 9382:8000 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.1.1
+docker run --rm -p 9382:8443 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.2.1
 ```
 
 Poi apri nel browser:
 
 ```text
-http://127.0.0.1:9382
+https://127.0.0.1:9382
 ```
 
 ### Avvio con Docker Compose
@@ -81,8 +98,19 @@ docker compose up --build
 Anche in questo caso l'app sarà disponibile su:
 
 ```text
-http://127.0.0.1:9382
+https://127.0.0.1:9382
 ```
+
+### Configurazione TLS nel container
+
+Il container avvia Gunicorn in HTTPS usando queste variabili:
+
+- `TLS_ENABLED=true`
+- `TLS_CERT_FILE=/app/tls/fullchain.pem`
+- `TLS_KEY_FILE=/app/tls/privkey.pem`
+- `PORT=8443`
+
+Se i file TLS non sono presenti, il container termina con errore esplicito.
 
 ## File principali
 
@@ -94,8 +122,12 @@ http://127.0.0.1:9382
 - [app_version.py](/Users/spagnolo/github/PuliziaDatiSinergia/app_version.py): nome e versione ufficiale dell'app
 - [requirements.txt](/Users/spagnolo/github/PuliziaDatiSinergia/requirements.txt): dipendenze Python
 - [Dockerfile](/Users/spagnolo/github/PuliziaDatiSinergia/Dockerfile): immagine Docker della web app
+- [docker-entrypoint.sh](/Users/spagnolo/github/PuliziaDatiSinergia/docker-entrypoint.sh): avvio Gunicorn con TLS
 - [docker-compose.yml](/Users/spagnolo/github/PuliziaDatiSinergia/docker-compose.yml): avvio rapido containerizzato
+- [run_docker.sh](/Users/spagnolo/github/PuliziaDatiSinergia/run_docker.sh): build e avvio rapido del container Docker
 - [.dockerignore](/Users/spagnolo/github/PuliziaDatiSinergia/.dockerignore): esclusioni dal contesto Docker
+- [tls/fullchain.pem](/Users/spagnolo/github/PuliziaDatiSinergia/tls/fullchain.pem): certificato TLS usato dal container
+- [tls/privkey.pem](/Users/spagnolo/github/PuliziaDatiSinergia/tls/privkey.pem): chiave privata TLS usata dal container
 
 ## Versione applicazione
 
@@ -106,7 +138,7 @@ La versione corrente è definita in:
 Valori attuali:
 
 - `APP_NAME = "Pulizia Dati Sinergia"`
-- `APP_VERSION = "1.1.1"`
+- `APP_VERSION = "1.2.1"`
 
 ## Regola di manutenzione
 
@@ -125,3 +157,4 @@ Questo serve a mantenere coerenti:
 - È disponibile anche la modalità `dry run`, che genera gli output senza chiamare il geocoder.
 - Se il file contiene molti indirizzi, l'elaborazione può richiedere tempo a causa del rate limit del servizio.
 - Il container Docker deve avere accesso a internet per poter interrogare Nominatim durante il geocoding reale.
+- Con certificati autofirmati o non riconosciuti dal sistema, il browser potrebbe mostrare un avviso HTTPS alla prima apertura.
