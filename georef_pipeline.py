@@ -24,6 +24,10 @@ PLACEHOLDER_VALUES = {
     "CARRARA",
 }
 CF_RE = re.compile(r"^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$")
+SEARCH_PREFIX_RE = re.compile(
+    r"^(?:LUOGO\s+DETTO|LOCALIT[ÀA']|LOC\.?|LDT)\s+",
+    re.IGNORECASE,
+)
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 DEFAULT_USER_AGENT = "PuliziaDatiSinergia-Geocoder/1.0 (+local-script)"
 
@@ -47,6 +51,17 @@ def normalized_text(value: object) -> str:
     if value is None:
         return ""
     return str(value).strip().upper()
+
+
+def normalize_search_text(value: object) -> str:
+    if value in ("", None):
+        return ""
+    text = re.sub(r"\s+", " ", str(value).strip())
+    while True:
+        cleaned = SEARCH_PREFIX_RE.sub("", text).strip()
+        if cleaned == text:
+            return cleaned
+        text = cleaned
 
 
 def normalize_headers(raw_headers: list[object]) -> list[str]:
@@ -362,7 +377,7 @@ def build_structured_params(
     country_code: str,
     email: str | None,
 ) -> dict[str, str]:
-    street_name = row.get("CIVICO_NORM", "").strip()
+    street_name = normalize_search_text(row.get("CIVICO_NORM", ""))
     house_number = row.get("NUMERO CIVICO", "").strip()
     city = row.get("COMUNE_NEW", "").strip()
     params = {
@@ -386,8 +401,14 @@ def build_freeform_params(
     country_code: str,
     email: str | None,
 ) -> dict[str, str]:
+    house_number = row.get("NUMERO CIVICO", "").strip()
+    address_name = normalize_search_text(row.get("INDIRIZZO NORMALIZZATO", ""))
+    if not address_name:
+        address_name = normalize_search_text(row.get("CIVICO_NORM", ""))
+    if address_name and house_number and not address_name.endswith(f" {house_number}"):
+        address_name = f"{address_name} {house_number}".strip()
     parts = [
-        row.get("INDIRIZZO NORMALIZZATO", "").strip(),
+        address_name,
         row.get("COMUNE_NEW", "").strip(),
         country,
     ]

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-IMAGE_NAME="pulizia-dati-sinergia:1.2.2"
+IMAGE_NAME="pulizia-dati-sinergia:1.2.3"
 CONTAINER_NAME="pulizia-dati-sinergia"
 LETSENCRYPT_ROOT="/etc/letsencrypt"
 LETSENCRYPT_SITE="rtapp.isti.cnr.it"
