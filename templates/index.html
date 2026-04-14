@@ -7,11 +7,13 @@
     <style>
       :root {
         --bg: #f5efe6;
-        --panel: rgba(255, 252, 247, 0.92);
+        --panel: rgba(255, 252, 247, 0.94);
         --ink: #16211d;
         --muted: #53635d;
         --accent: #c85b36;
         --accent-dark: #8f371f;
+        --ok: #2f7c5b;
+        --warn: #bb6f20;
         --line: rgba(22, 33, 29, 0.12);
         --shadow: 0 24px 60px rgba(59, 46, 32, 0.16);
       }
@@ -35,7 +37,7 @@
       }
 
       .shell {
-        width: min(880px, 100%);
+        width: min(1040px, 100%);
         background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 28px;
@@ -71,7 +73,7 @@
 
       .subtitle {
         margin: 0;
-        max-width: 60ch;
+        max-width: 62ch;
         font-size: 1.05rem;
         line-height: 1.6;
         color: var(--muted);
@@ -79,8 +81,7 @@
 
       .content {
         display: grid;
-        grid-template-columns: 1.2fr 0.8fr;
-        gap: 0;
+        grid-template-columns: 1.05fr 0.95fr;
       }
 
       .form-pane,
@@ -132,9 +133,15 @@
       .toggle input {
         width: 18px;
         height: 18px;
+        margin: 0;
       }
 
-      button {
+      .toggle label {
+        margin: 0;
+      }
+
+      button,
+      .download-link {
         border: 0;
         border-radius: 18px;
         padding: 16px 22px;
@@ -145,10 +152,14 @@
         cursor: pointer;
         width: 100%;
         box-shadow: 0 14px 26px rgba(143, 55, 31, 0.24);
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
       }
 
-      button:hover {
-        filter: brightness(1.03);
+      button:disabled {
+        opacity: 0.55;
+        cursor: wait;
       }
 
       .error {
@@ -157,6 +168,111 @@
         border-radius: 14px;
         background: rgba(200, 91, 54, 0.12);
         color: #7b2e18;
+      }
+
+      .status-card {
+        margin-top: 24px;
+        padding: 22px;
+        border-radius: 22px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .status-card[hidden] {
+        display: none;
+      }
+
+      .status-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: baseline;
+      }
+
+      .status-title {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+
+      .status-badge {
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 0.8rem;
+        background: rgba(22, 33, 29, 0.07);
+        color: var(--muted);
+      }
+
+      .progress-row {
+        margin-top: 16px;
+      }
+
+      .progress-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 0.94rem;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+
+      .progress-track {
+        height: 12px;
+        border-radius: 999px;
+        background: rgba(22, 33, 29, 0.08);
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        width: 0%;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--accent), var(--ok));
+        transition: width 0.35s ease;
+      }
+
+      .status-message {
+        margin: 14px 0 0;
+        color: var(--ink);
+        line-height: 1.5;
+      }
+
+      .status-grid {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .metric {
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: rgba(22, 33, 29, 0.04);
+      }
+
+      .metric-label {
+        display: block;
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+      }
+
+      .metric-value {
+        font-size: 1rem;
+        font-weight: 700;
+      }
+
+      .status-actions {
+        margin-top: 18px;
+      }
+
+      .status-note {
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .download-link[hidden] {
+        display: none;
       }
 
       .info-pane h2 {
@@ -180,7 +296,7 @@
         line-height: 1.6;
       }
 
-      @media (max-width: 860px) {
+      @media (max-width: 900px) {
         .content {
           grid-template-columns: 1fr;
         }
@@ -203,10 +319,10 @@
     <main class="shell">
       <section class="hero">
         <span class="kicker">{{ app_name }} v{{ app_version }}</span>
-        <h1>Carica il file, scarica lo ZIP con i risultati.</h1>
+        <h1>Carica il file, segui l’elaborazione, scarica lo ZIP finale.</h1>
         <p class="subtitle">
           L'app analizza il file di partenza, separa i record in validi, da verificare e scarti,
-          geocodifica i validi tramite OpenStreetMap e restituisce tutto in un archivio pronto da aprire.
+          geocodifica i validi tramite OpenStreetMap e ti mostra in tempo reale a che punto è il lavoro.
         </p>
       </section>
 
@@ -216,7 +332,7 @@
           <div class="error">{{ error }}</div>
           {% endif %}
 
-          <form method="post" action="/process" enctype="multipart/form-data">
+          <form id="upload-form" method="post" action="/api/jobs" enctype="multipart/form-data">
             <div class="field">
               <label for="source_file">File di input</label>
               <input id="source_file" name="source_file" type="file" accept=".xlsx,.xlsm,.csv" required>
@@ -226,9 +342,7 @@
             <div class="field">
               <label for="email">Email per Nominatim</label>
               <input id="email" name="email" type="email" placeholder="nome@dominio.it">
-              <div class="hint">
-                Facoltativa ma consigliata quando fai geocoding reale su OpenStreetMap.
-              </div>
+              <div class="hint">Facoltativa ma consigliata quando fai geocoding reale su OpenStreetMap.</div>
             </div>
 
             <div class="field toggle">
@@ -236,8 +350,54 @@
               <label for="dry_run">Dry run: genera gli output senza chiamare il geocoder</label>
             </div>
 
-            <button type="submit">Elabora e Scarica ZIP</button>
+            <button id="submit-button" type="submit">Avvia Elaborazione</button>
           </form>
+
+          <section id="status-card" class="status-card" hidden>
+            <div class="status-top">
+              <h2 class="status-title">Stato elaborazione</h2>
+              <span id="status-badge" class="status-badge">In attesa</span>
+            </div>
+
+            <div class="progress-row">
+              <div class="progress-meta">
+                <span id="progress-label">0%</span>
+                <span id="eta-label">Tempo rimanente: calcolo in corso</span>
+              </div>
+              <div class="progress-track">
+                <div id="progress-fill" class="progress-fill"></div>
+              </div>
+            </div>
+
+            <p id="status-message" class="status-message">Nessuna elaborazione in corso.</p>
+
+            <div class="status-grid">
+              <div class="metric">
+                <span class="metric-label">File</span>
+                <span id="metric-file" class="metric-value">-</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Fase</span>
+                <span id="metric-stage" class="metric-value">-</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Validi / da verificare / scarti</span>
+                <span id="metric-analysis" class="metric-value">-</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Geocoding</span>
+                <span id="metric-geocoding" class="metric-value">-</span>
+              </div>
+            </div>
+
+            <div class="status-actions">
+              <a id="download-link" class="download-link" href="#" hidden>Scarica ZIP</a>
+            </div>
+
+            <div id="status-note" class="status-note">
+              La stima del tempo rimanente diventa piu precisa dopo le prime richieste di geocoding.
+            </div>
+          </section>
         </div>
 
         <aside class="info-pane">
@@ -252,7 +412,7 @@
 
           <div class="note">
             Il geocoding usa Nominatim di OpenStreetMap con cache locale e limitazione delle richieste.
-            Se il file contiene molti indirizzi, l'elaborazione può richiedere un po' di tempo.
+            Se il file contiene molti indirizzi, l'elaborazione puo richiedere un po' di tempo.
           </div>
 
           <div class="note">
@@ -261,5 +421,174 @@
         </aside>
       </section>
     </main>
+
+    <script>
+      const form = document.getElementById("upload-form");
+      const submitButton = document.getElementById("submit-button");
+      const statusCard = document.getElementById("status-card");
+      const statusBadge = document.getElementById("status-badge");
+      const progressFill = document.getElementById("progress-fill");
+      const progressLabel = document.getElementById("progress-label");
+      const etaLabel = document.getElementById("eta-label");
+      const statusMessage = document.getElementById("status-message");
+      const metricFile = document.getElementById("metric-file");
+      const metricStage = document.getElementById("metric-stage");
+      const metricAnalysis = document.getElementById("metric-analysis");
+      const metricGeocoding = document.getElementById("metric-geocoding");
+      const downloadLink = document.getElementById("download-link");
+      const statusNote = document.getElementById("status-note");
+
+      let pollTimer = null;
+
+      function formatSeconds(value) {
+        if (value === null || value === undefined) {
+          return "calcolo in corso";
+        }
+        if (value <= 0) {
+          return "meno di un secondo";
+        }
+        const minutes = Math.floor(value / 60);
+        const seconds = value % 60;
+        if (minutes > 0) {
+          return `${minutes} min ${seconds} s`;
+        }
+        return `${seconds} s`;
+      }
+
+      function humanStage(stage) {
+        const labels = {
+          queued: "In coda",
+          analysis: "Analisi",
+          analysis_complete: "Analisi completata",
+          geocoding: "Geocoding",
+          packaging: "Preparazione ZIP",
+          completed: "Completato",
+          error: "Errore",
+        };
+        return labels[stage] || stage || "-";
+      }
+
+      function stopPolling() {
+        if (pollTimer) {
+          clearTimeout(pollTimer);
+          pollTimer = null;
+        }
+      }
+
+      function updateStatus(data) {
+        statusCard.hidden = false;
+        progressFill.style.width = `${data.progress_percent}%`;
+        progressLabel.textContent = `${data.progress_percent}%`;
+        statusBadge.textContent = data.status === "completed" ? "Pronto" : humanStage(data.stage);
+        etaLabel.textContent = data.status === "completed"
+          ? "Tempo rimanente: completato"
+          : `Tempo rimanente: ${formatSeconds(data.eta_seconds)}`;
+        statusMessage.textContent = data.error || data.message || "Elaborazione in corso";
+        metricFile.textContent = data.input_file || "-";
+        metricStage.textContent = humanStage(data.stage);
+
+        if (data.analysis_counts) {
+          const counts = data.analysis_counts;
+          metricAnalysis.textContent = `${counts.validi || 0} / ${counts.da_verificare || 0} / ${counts.scarti || 0}`;
+        } else {
+          metricAnalysis.textContent = "in attesa";
+        }
+
+        if (data.geocoding && data.geocoding.total !== null && data.geocoding.total !== undefined) {
+          const total = data.geocoding.total || 0;
+          const current = data.geocoding.current || 0;
+          const matched = data.geocoding.matched;
+          const notFound = data.geocoding.not_found;
+          let label = `${current}/${total}`;
+          if (matched !== null && matched !== undefined) {
+            label += ` • match ${matched}`;
+          }
+          if (notFound !== null && notFound !== undefined) {
+            label += ` • non trovati ${notFound}`;
+          }
+          metricGeocoding.textContent = label;
+        } else {
+          metricGeocoding.textContent = "in attesa";
+        }
+
+        if (data.status === "completed" && data.download_url) {
+          downloadLink.href = data.download_url;
+          downloadLink.hidden = false;
+          submitButton.disabled = false;
+          submitButton.textContent = "Avvia Elaborazione";
+          statusNote.textContent = "Elaborazione finita. Ora puoi scaricare lo ZIP completo dei risultati.";
+        } else if (data.status === "error") {
+          downloadLink.hidden = true;
+          submitButton.disabled = false;
+          submitButton.textContent = "Avvia Elaborazione";
+          statusNote.textContent = "L'elaborazione si e fermata. Correggi il problema e riprova.";
+        } else {
+          downloadLink.hidden = true;
+          statusNote.textContent = "La stima del tempo rimanente diventa piu precisa dopo le prime richieste di geocoding.";
+        }
+      }
+
+      async function pollJob(jobId) {
+        try {
+          const response = await fetch(`/api/jobs/${jobId}`, {
+            headers: { "Accept": "application/json" },
+          });
+          const data = await response.json();
+          updateStatus(data);
+
+          if (data.status === "completed" || data.status === "error") {
+            stopPolling();
+            return;
+          }
+
+          pollTimer = setTimeout(() => pollJob(jobId), 1000);
+        } catch (error) {
+          stopPolling();
+          submitButton.disabled = false;
+          submitButton.textContent = "Avvia Elaborazione";
+          statusCard.hidden = false;
+          statusMessage.textContent = "Errore nel recupero dello stato del job.";
+          statusNote.textContent = "Verifica che il server sia raggiungibile e riprova.";
+        }
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        stopPolling();
+        downloadLink.hidden = true;
+        submitButton.disabled = true;
+        submitButton.textContent = "Elaborazione in corso...";
+        statusCard.hidden = false;
+        progressFill.style.width = "0%";
+        progressLabel.textContent = "0%";
+        statusBadge.textContent = "Invio";
+        etaLabel.textContent = "Tempo rimanente: calcolo in corso";
+        statusMessage.textContent = "Caricamento del file e creazione del job...";
+        metricFile.textContent = document.getElementById("source_file").files[0]?.name || "-";
+        metricStage.textContent = "Avvio";
+        metricAnalysis.textContent = "in attesa";
+        metricGeocoding.textContent = "in attesa";
+
+        try {
+          const response = await fetch("/api/jobs", {
+            method: "POST",
+            body: new FormData(form),
+          });
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Errore durante la creazione del job.");
+          }
+
+          updateStatus(data);
+          pollJob(data.job_id);
+        } catch (error) {
+          submitButton.disabled = false;
+          submitButton.textContent = "Avvia Elaborazione";
+          statusMessage.textContent = error.message;
+          statusNote.textContent = "Il job non e stato avviato. Controlla il file e riprova.";
+        }
+      });
+    </script>
   </body>
 </html>

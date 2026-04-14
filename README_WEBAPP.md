@@ -87,13 +87,13 @@ Nota importante:
 ### Build immagine
 
 ```bash
-docker build -t pulizia-dati-sinergia:1.2.3 .
+docker build -t pulizia-dati-sinergia:1.3.0 .
 ```
 
 ### Avvio container
 
 ```bash
-docker run --rm -p 9382:8443 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.2.3
+docker run --rm -p 9382:8443 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.3.0
 ```
 
 Poi apri nel browser:
@@ -151,7 +151,7 @@ La versione corrente è definita in:
 Valori attuali:
 
 - `APP_NAME = "Pulizia Dati Sinergia"`
-- `APP_VERSION = "1.2.3"`
+- `APP_VERSION = "1.3.0"`
 
 ## Regola di manutenzione
 
@@ -167,6 +167,7 @@ Questo serve a mantenere coerenti:
 
 - Il geocoding usa Nominatim di OpenStreetMap.
 - Prima della ricerca OSM, la query viene ripulita da prefissi non utili come `LUOGO DETTO`, `LDT`, `LOC.` e `LOCALITÀ`.
+- La home mostra lo stato del job, la percentuale di avanzamento e una stima del tempo rimanente fino alla generazione dello ZIP.
 - Per il geocoding reale è consigliato inserire un'email nel form.
 - È disponibile anche la modalità `dry run`, che genera gli output senza chiamare il geocoder.
 - Se il file contiene molti indirizzi, l'elaborazione può richiedere tempo a causa del rate limit del servizio.
