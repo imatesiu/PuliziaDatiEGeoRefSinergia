@@ -28,6 +28,10 @@ SEARCH_PREFIX_RE = re.compile(
     r"^(?:LUOGO\s+DETTO|LOCALIT[ÀA']|LOC\.?|LDT)\s+",
     re.IGNORECASE,
 )
+TRAILING_CITY_RE = re.compile(
+    r"\b\d+[A-Z/.\-]*\s+([A-ZÀ-ÖØ-Ý][A-ZÀ-ÖØ-Ý' -]+)$",
+    re.IGNORECASE,
+)
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 DEFAULT_USER_AGENT = "PuliziaDatiSinergia-Geocoder/1.0 (+local-script)"
 
@@ -62,6 +66,30 @@ def normalize_search_text(value: object) -> str:
         if cleaned == text:
             return cleaned
         text = cleaned
+
+
+def compact_spaces(value: object) -> str:
+    if value in ("", None):
+        return ""
+    return re.sub(r"\s+", " ", str(value).strip())
+
+
+def infer_alternate_city(row: dict[str, str]) -> str:
+    raw = compact_spaces(row.get("INDIRES", ""))
+    primary_city = normalized_text(row.get("COMUNE_NEW", ""))
+    match = TRAILING_CITY_RE.search(raw.upper())
+    if not match:
+        return ""
+
+    candidate = compact_spaces(match.group(1))
+    candidate_upper = normalized_text(candidate)
+    if not candidate_upper or candidate_upper == primary_city:
+        return ""
+    if candidate_upper in {"INT", "INTERNO", "SCALA", "PIANO", "TERRA", "BIS", "TER"}:
+        return ""
+    if any(char.isdigit() for char in candidate_upper):
+        return ""
+    return candidate.title()
 
 
 def normalize_headers(raw_headers: list[object]) -> list[str]:
@@ -373,13 +401,14 @@ def read_csv_rows(csv_path: Path) -> tuple[list[str], list[dict[str, str]]]:
 def build_structured_params(
     row: dict[str, str],
     *,
+    city: str | None = None,
     country: str,
     country_code: str,
     email: str | None,
 ) -> dict[str, str]:
     street_name = normalize_search_text(row.get("CIVICO_NORM", ""))
     house_number = row.get("NUMERO CIVICO", "").strip()
-    city = row.get("COMUNE_NEW", "").strip()
+    city = compact_spaces(city or row.get("COMUNE_NEW", ""))
     params = {
         "street": f"{house_number} {street_name}".strip(),
         "city": city,
@@ -397,19 +426,23 @@ def build_structured_params(
 def build_freeform_params(
     row: dict[str, str],
     *,
+    city: str | None = None,
     country: str,
     country_code: str,
     email: str | None,
+    road_only: bool = False,
 ) -> dict[str, str]:
     house_number = row.get("NUMERO CIVICO", "").strip()
     address_name = normalize_search_text(row.get("INDIRIZZO NORMALIZZATO", ""))
     if not address_name:
         address_name = normalize_search_text(row.get("CIVICO_NORM", ""))
-    if address_name and house_number and not address_name.endswith(f" {house_number}"):
+    if road_only:
+        address_name = normalize_search_text(row.get("CIVICO_NORM", "")) or address_name
+    elif address_name and house_number and not address_name.endswith(f" {house_number}"):
         address_name = f"{address_name} {house_number}".strip()
     parts = [
         address_name,
-        row.get("COMUNE_NEW", "").strip(),
+        compact_spaces(city or row.get("COMUNE_NEW", "")),
         country,
     ]
     params = {
@@ -426,6 +459,97 @@ def build_freeform_params(
 
 def cache_key(params: dict[str, str]) -> str:
     return json.dumps(params, ensure_ascii=False, sort_keys=True)
+
+
+def iter_geocoding_queries(
+    row: dict[str, str],
+    *,
+    country: str,
+    country_code: str,
+    email: str | None,
+) -> list[tuple[dict[str, str], str]]:
+    primary_city = compact_spaces(row.get("COMUNE_NEW", ""))
+    alternate_city = infer_alternate_city(row)
+    queries: list[tuple[dict[str, str], str]] = [
+        (
+            build_structured_params(
+                row,
+                city=primary_city,
+                country=country,
+                country_code=country_code,
+                email=email,
+            ),
+            "structured",
+        ),
+        (
+            build_freeform_params(
+                row,
+                city=primary_city,
+                country=country,
+                country_code=country_code,
+                email=email,
+            ),
+            "freeform",
+        ),
+        (
+            build_freeform_params(
+                row,
+                city=primary_city,
+                country=country,
+                country_code=country_code,
+                email=email,
+                road_only=True,
+            ),
+            "road_only",
+        ),
+    ]
+
+    if alternate_city:
+        queries.extend(
+            [
+                (
+                    build_structured_params(
+                        row,
+                        city=alternate_city,
+                        country=country,
+                        country_code=country_code,
+                        email=email,
+                    ),
+                    "structured_alt_city",
+                ),
+                (
+                    build_freeform_params(
+                        row,
+                        city=alternate_city,
+                        country=country,
+                        country_code=country_code,
+                        email=email,
+                    ),
+                    "freeform_alt_city",
+                ),
+                (
+                    build_freeform_params(
+                        row,
+                        city=alternate_city,
+                        country=country,
+                        country_code=country_code,
+                        email=email,
+                        road_only=True,
+                    ),
+                    "road_only_alt_city",
+                ),
+            ]
+        )
+
+    deduped: list[tuple[dict[str, str], str]] = []
+    seen: set[str] = set()
+    for params, query_type in queries:
+        key = cache_key(params)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append((params, query_type))
+    return deduped
 
 
 def enforce_rate_limit(last_request_at: float | None, sleep_seconds: float) -> None:
@@ -457,7 +581,16 @@ def http_get_json(
             retriable = exc.code in {429, 500, 502, 503, 504}
             if attempt == retries or not retriable:
                 raise
-            time.sleep(max(sleep_seconds, attempt * 2))
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            wait_seconds = max(sleep_seconds, attempt * 2)
+            if retry_after:
+                try:
+                    wait_seconds = max(wait_seconds, float(retry_after))
+                except ValueError:
+                    wait_seconds = max(wait_seconds, 15.0)
+            elif exc.code == 429:
+                wait_seconds = max(wait_seconds, attempt * 15.0)
+            time.sleep(wait_seconds)
             last_request_at = time.monotonic()
         except URLError:
             if attempt == retries:
@@ -588,34 +721,17 @@ def geocode_csv(
     not_found = 0
 
     for index, row in enumerate(rows, start=1):
-        structured_params = build_structured_params(
+        best_result = None
+        source = "api"
+        query_type = "structured"
+        for params, candidate_query_type in iter_geocoding_queries(
             row,
             country=country,
             country_code=country_code,
             email=email,
-        )
-        results, last_request_at, source = lookup_with_cache(
-            structured_params,
-            cache=cache,
-            user_agent=user_agent,
-            retries=retries,
-            sleep_seconds=sleep_seconds,
-            last_request_at=last_request_at,
-            dry_run=dry_run,
-        )
-
-        query_type = "structured"
-        best_result = results[0] if results else None
-
-        if best_result is None:
-            freeform_params = build_freeform_params(
-                row,
-                country=country,
-                country_code=country_code,
-                email=email,
-            )
+        ):
             results, last_request_at, source = lookup_with_cache(
-                freeform_params,
+                params,
                 cache=cache,
                 user_agent=user_agent,
                 retries=retries,
@@ -623,8 +739,10 @@ def geocode_csv(
                 last_request_at=last_request_at,
                 dry_run=dry_run,
             )
-            query_type = "freeform"
+            query_type = candidate_query_type
             best_result = results[0] if results else None
+            if best_result is not None:
+                break
 
         if best_result is None:
             not_found += 1
