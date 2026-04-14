@@ -15,7 +15,12 @@ from flask import Flask, abort, jsonify, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 from app_version import APP_NAME, APP_VERSION
-from georef_pipeline import analyze_input_file, copy_input_to_output, geocode_csv
+from georef_pipeline import (
+    analyze_input_file,
+    build_da_verificare_from_geocoded,
+    copy_input_to_output,
+    geocode_csv_dedup_by_address,
+)
 
 
 ALLOWED_SUFFIXES = {".xlsx", ".xlsm", ".csv"}
@@ -222,7 +227,7 @@ def process_job(job_id: str) -> None:
             message="Geocodifica degli indirizzi validi in corso",
             eta_seconds=None,
         )
-        geocode = geocode_csv(
+        geocode = geocode_csv_dedup_by_address(
             analysis["paths"]["validi"],
             geocoded_csv,
             cache_path=cache_path,
@@ -231,6 +236,11 @@ def process_job(job_id: str) -> None:
             dry_run=dry_run,
             progress_callback=progress_callback,
         )
+        da_verificare = build_da_verificare_from_geocoded(
+            geocoded_csv,
+            analysis["paths"]["da_verificare"],
+        )
+        analysis_counts["da_verificare"] = da_verificare["rows"]
 
         update_job(
             job_id,
@@ -238,11 +248,12 @@ def process_job(job_id: str) -> None:
             progress=1.0 - PACKAGING_WEIGHT,
             message="Preparazione archivio ZIP finale",
             eta_seconds=1,
+            analysis_counts=analysis_counts,
             geocoding={
-                "current": geocode["rows"],
-                "total": geocode["rows"],
-                "matched": geocode["matched"],
-                "not_found": geocode["not_found"],
+                "current": geocode["unique_addresses"],
+                "total": geocode["unique_addresses"],
+                "matched": geocode["matched_groups"],
+                "not_found": geocode["not_found_groups"],
                 "last_address": None,
                 "last_status": None,
             },

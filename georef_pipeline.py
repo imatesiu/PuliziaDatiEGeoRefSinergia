@@ -74,6 +74,10 @@ def compact_spaces(value: object) -> str:
     return re.sub(r"\s+", " ", str(value).strip())
 
 
+def normalized_address_key(value: object) -> str:
+    return compact_spaces(value).upper()
+
+
 def infer_alternate_city(row: dict[str, str]) -> str:
     raw = compact_spaces(row.get("INDIRES", ""))
     primary_city = normalized_text(row.get("COMUNE_NEW", ""))
@@ -235,8 +239,6 @@ def classify_row(row: dict[str, object], duplicate_map: dict[str, list[int]]) ->
         category = "scarti"
     elif "dati_strutturati_mancanti" in issues:
         category = "scarti"
-    elif any(issue in issues for issue in ("nota_presente", "civico_zero", "indirizzo_duplicato")):
-        category = "da_verificare"
     else:
         category = "validi"
 
@@ -640,6 +642,22 @@ def enrich_row(
     enriched["GEOCODER_STATUS"] = status
     enriched["GEOCODER_SOURCE"] = source
     enriched["GEOCODER_QUERY_TYPE"] = query_type
+    strategy_map = {
+        "structured": ("indirizzo_con_civico", "Ricerca standard con civico e comune normalizzato."),
+        "freeform": ("indirizzo_libero_con_civico", "Ricerca libera con civico e comune normalizzato."),
+        "road_only": ("solo_toponimo_senza_civico", "Coordinate cercate senza numero civico dopo fallimento della ricerca con civico."),
+        "structured_alt_city": ("indirizzo_con_civico_comune_alternativo", "Ricerca con civico usando un comune dedotto dal testo grezzo."),
+        "freeform_alt_city": ("indirizzo_libero_con_civico_comune_alternativo", "Ricerca libera con civico usando un comune dedotto dal testo grezzo."),
+        "road_only_alt_city": ("solo_toponimo_senza_civico_comune_alternativo", "Coordinate cercate senza numero civico e con comune alternativo dedotto dal testo grezzo."),
+    }
+    strategy, note = strategy_map.get(
+        query_type,
+        ("strategia_non_specificata", "Strategia di geocoding non specificata."),
+    )
+    if status == "not_found" and query_type.startswith("road_only"):
+        note = f"{note} Anche il fallback senza civico non ha prodotto risultati."
+    enriched["GEOCODER_STRATEGY"] = strategy
+    enriched["GEOCODER_NOTE"] = note
 
     if result is None:
         enriched["X"] = row.get("X", "")
@@ -669,11 +687,69 @@ def enrich_row(
     return enriched
 
 
+def geocode_single_row(
+    row: dict[str, str],
+    *,
+    cache: dict[str, Any],
+    user_agent: str,
+    retries: int,
+    sleep_seconds: float,
+    last_request_at: float | None,
+    dry_run: bool,
+    country: str,
+    country_code: str,
+    email: str | None,
+) -> tuple[dict[str, str], float | None]:
+    best_result = None
+    source = "api"
+    query_type = "structured"
+    for params, candidate_query_type in iter_geocoding_queries(
+        row,
+        country=country,
+        country_code=country_code,
+        email=email,
+    ):
+        results, last_request_at, source = lookup_with_cache(
+            params,
+            cache=cache,
+            user_agent=user_agent,
+            retries=retries,
+            sleep_seconds=sleep_seconds,
+            last_request_at=last_request_at,
+            dry_run=dry_run,
+        )
+        query_type = candidate_query_type
+        best_result = results[0] if results else None
+        if best_result is not None:
+            break
+
+    if best_result is None:
+        output_row = enrich_row(
+            row,
+            None,
+            status="not_found" if not dry_run else "dry_run",
+            source=source,
+            query_type=query_type,
+        )
+    else:
+        output_row = enrich_row(
+            row,
+            best_result,
+            status="matched",
+            source=source,
+            query_type=query_type,
+        )
+
+    return output_row, last_request_at
+
+
 def write_generic_csv(path: Path, rows: list[dict[str, str]], base_headers: list[str]) -> None:
     extra_headers = [
         "GEOCODER_STATUS",
         "GEOCODER_SOURCE",
         "GEOCODER_QUERY_TYPE",
+        "GEOCODER_STRATEGY",
+        "GEOCODER_NOTE",
         "LAT",
         "LON",
         "DISPLAY_NAME",
@@ -693,6 +769,27 @@ def write_generic_csv(path: Path, rows: list[dict[str, str]], base_headers: list
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def write_rows_with_headers(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def build_da_verificare_from_geocoded(validi_geocoded_csv: Path, da_verificare_csv: Path) -> dict[str, Any]:
+    fieldnames, rows = read_csv_rows(validi_geocoded_csv)
+    da_verificare_rows = [
+        row for row in rows if (row.get("GEOCODER_STATUS") or "").strip() != "matched"
+    ]
+    write_rows_with_headers(da_verificare_csv, da_verificare_rows, fieldnames)
+    return {
+        "rows": len(da_verificare_rows),
+        "fieldnames": fieldnames,
+        "path": da_verificare_csv,
+    }
 
 
 def geocode_csv(
@@ -721,47 +818,22 @@ def geocode_csv(
     not_found = 0
 
     for index, row in enumerate(rows, start=1):
-        best_result = None
-        source = "api"
-        query_type = "structured"
-        for params, candidate_query_type in iter_geocoding_queries(
+        output_row, last_request_at = geocode_single_row(
             row,
+            cache=cache,
+            user_agent=user_agent,
+            retries=retries,
+            sleep_seconds=sleep_seconds,
+            last_request_at=last_request_at,
+            dry_run=dry_run,
             country=country,
             country_code=country_code,
             email=email,
-        ):
-            results, last_request_at, source = lookup_with_cache(
-                params,
-                cache=cache,
-                user_agent=user_agent,
-                retries=retries,
-                sleep_seconds=sleep_seconds,
-                last_request_at=last_request_at,
-                dry_run=dry_run,
-            )
-            query_type = candidate_query_type
-            best_result = results[0] if results else None
-            if best_result is not None:
-                break
-
-        if best_result is None:
-            not_found += 1
-            output_row = enrich_row(
-                row,
-                None,
-                status="not_found" if not dry_run else "dry_run",
-                source=source,
-                query_type=query_type,
-            )
-        else:
+        )
+        if output_row["GEOCODER_STATUS"] == "matched":
             matched += 1
-            output_row = enrich_row(
-                row,
-                best_result,
-                status="matched",
-                source=source,
-                query_type=query_type,
-            )
+        else:
+            not_found += 1
 
         output_rows.append(output_row)
         if progress_callback is not None:
@@ -777,6 +849,86 @@ def geocode_csv(
         "rows": len(rows),
         "matched": matched,
         "not_found": not_found,
+        "dry_run": dry_run,
+    }
+
+
+def geocode_csv_dedup_by_address(
+    input_csv: Path,
+    output_csv: Path,
+    *,
+    cache_path: Path,
+    email: str | None = None,
+    user_agent: str = DEFAULT_USER_AGENT,
+    country: str = "Italia",
+    country_code: str = "it",
+    sleep_seconds: float = 1.1,
+    retries: int = 3,
+    dry_run: bool = False,
+    progress_callback: Any | None = None,
+) -> dict[str, Any]:
+    headers, rows = read_csv_rows(input_csv)
+    grouped_rows: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for row in rows:
+        grouped_rows[normalized_address_key(row.get("INDIRIZZO NORMALIZZATO", ""))].append(row)
+
+    cache = load_cache(cache_path)
+    last_request_at: float | None = None
+    geocoded_by_key: dict[str, dict[str, str]] = {}
+    matched_groups = 0
+    not_found_groups = 0
+
+    for index, (key, group) in enumerate(grouped_rows.items(), start=1):
+        representative = dict(group[0])
+        geocoded_row, last_request_at = geocode_single_row(
+            representative,
+            cache=cache,
+            user_agent=user_agent,
+            retries=retries,
+            sleep_seconds=sleep_seconds,
+            last_request_at=last_request_at,
+            dry_run=dry_run,
+            country=country,
+            country_code=country_code,
+            email=email,
+        )
+        geocoded_row["GEOCODER_DUPLICATE_GROUP_SIZE"] = str(len(group))
+        geocoded_by_key[key] = geocoded_row
+        if geocoded_row["GEOCODER_STATUS"] == "matched":
+            matched_groups += 1
+        else:
+            not_found_groups += 1
+        if progress_callback is not None:
+            address = representative.get("INDIRIZZO NORMALIZZATO", "").strip() or representative.get("INDIRES", "").strip()
+            progress_callback(index, len(grouped_rows), address, geocoded_row["GEOCODER_STATUS"])
+
+    output_rows: list[dict[str, str]] = []
+    for row in rows:
+        key = normalized_address_key(row.get("INDIRIZZO NORMALIZZATO", ""))
+        geocoded = dict(geocoded_by_key[key])
+        geocoded["_row"] = row.get("_row", geocoded.get("_row", ""))
+        geocoded["_category"] = row.get("_category", geocoded.get("_category", ""))
+        geocoded["_issues"] = row.get("_issues", geocoded.get("_issues", ""))
+        geocoded["INDIRES"] = row.get("INDIRES", geocoded.get("INDIRES", ""))
+        geocoded["TYPE"] = row.get("TYPE", geocoded.get("TYPE", ""))
+        geocoded["CIVICO_NORM"] = row.get("CIVICO_NORM", geocoded.get("CIVICO_NORM", ""))
+        geocoded["NUMERO CIVICO"] = row.get("NUMERO CIVICO", geocoded.get("NUMERO CIVICO", ""))
+        geocoded["INDIRIZZO NORMALIZZATO"] = row.get("INDIRIZZO NORMALIZZATO", geocoded.get("INDIRIZZO NORMALIZZATO", ""))
+        geocoded["COMUNE_NEW"] = row.get("COMUNE_NEW", geocoded.get("COMUNE_NEW", ""))
+        geocoded["GEOCODER_REUSED_FOR_DUPLICATE"] = "yes" if int(geocoded["GEOCODER_DUPLICATE_GROUP_SIZE"]) > 1 else "no"
+        output_rows.append(geocoded)
+
+    save_cache(cache_path, cache)
+    extra_headers = headers + ["GEOCODER_DUPLICATE_GROUP_SIZE", "GEOCODER_REUSED_FOR_DUPLICATE"]
+    write_generic_csv(output_csv, output_rows, extra_headers)
+    return {
+        "input_csv": input_csv,
+        "output_csv": output_csv,
+        "cache_path": cache_path,
+        "rows": len(rows),
+        "unique_addresses": len(grouped_rows),
+        "matched_groups": matched_groups,
+        "not_found_groups": not_found_groups,
         "dry_run": dry_run,
     }
 
@@ -799,7 +951,7 @@ def run_full_pipeline(
     geocoded_csv = output_dir / f"{stem}_validi_geocoded.csv"
     cache_path = output_dir / "nominatim_cache.json"
 
-    geocode = geocode_csv(
+    geocode = geocode_csv_dedup_by_address(
         analysis["paths"]["validi"],
         geocoded_csv,
         cache_path=cache_path,
@@ -811,10 +963,15 @@ def run_full_pipeline(
         retries=retries,
         dry_run=dry_run,
     )
+    da_verificare = build_da_verificare_from_geocoded(
+        geocoded_csv,
+        analysis["paths"]["da_verificare"],
+    )
 
     analysis["paths"]["validi_geocoded"] = geocoded_csv
     analysis["paths"]["cache"] = cache_path
     analysis["geocode"] = geocode
+    analysis["da_verificare"] = da_verificare
     return analysis
 
 
