@@ -792,6 +792,29 @@ def build_da_verificare_from_geocoded(validi_geocoded_csv: Path, da_verificare_c
     }
 
 
+def split_geocoded_results(
+    geocoded_csv: Path,
+    matched_csv: Path,
+    da_verificare_csv: Path,
+) -> dict[str, Any]:
+    fieldnames, rows = read_csv_rows(geocoded_csv)
+    matched_rows = [
+        row for row in rows if (row.get("GEOCODER_STATUS") or "").strip() == "matched"
+    ]
+    da_verificare_rows = [
+        row for row in rows if (row.get("GEOCODER_STATUS") or "").strip() != "matched"
+    ]
+    write_rows_with_headers(matched_csv, matched_rows, fieldnames)
+    write_rows_with_headers(da_verificare_csv, da_verificare_rows, fieldnames)
+    return {
+        "matched_rows": len(matched_rows),
+        "da_verificare_rows": len(da_verificare_rows),
+        "fieldnames": fieldnames,
+        "matched_path": matched_csv,
+        "da_verificare_path": da_verificare_csv,
+    }
+
+
 def geocode_csv(
     input_csv: Path,
     output_csv: Path,
@@ -951,9 +974,10 @@ def run_full_pipeline(
     geocoded_csv = output_dir / f"{stem}_validi_geocoded.csv"
     cache_path = output_dir / "nominatim_cache.json"
 
+    geocoded_all_csv = output_dir / f"{stem}_validi_geocoded_all.csv"
     geocode = geocode_csv_dedup_by_address(
         analysis["paths"]["validi"],
-        geocoded_csv,
+        geocoded_all_csv,
         cache_path=cache_path,
         email=geocoder_email,
         user_agent=user_agent,
@@ -963,15 +987,17 @@ def run_full_pipeline(
         retries=retries,
         dry_run=dry_run,
     )
-    da_verificare = build_da_verificare_from_geocoded(
+    split = split_geocoded_results(
+        geocoded_all_csv,
         geocoded_csv,
         analysis["paths"]["da_verificare"],
     )
+    geocoded_all_csv.unlink(missing_ok=True)
 
     analysis["paths"]["validi_geocoded"] = geocoded_csv
     analysis["paths"]["cache"] = cache_path
     analysis["geocode"] = geocode
-    analysis["da_verificare"] = da_verificare
+    analysis["da_verificare"] = split
     return analysis
 
 

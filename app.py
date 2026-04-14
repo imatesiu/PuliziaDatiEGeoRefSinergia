@@ -17,9 +17,9 @@ from werkzeug.utils import secure_filename
 from app_version import APP_NAME, APP_VERSION
 from georef_pipeline import (
     analyze_input_file,
-    build_da_verificare_from_geocoded,
     copy_input_to_output,
     geocode_csv_dedup_by_address,
+    split_geocoded_results,
 )
 
 
@@ -190,6 +190,7 @@ def process_job(job_id: str) -> None:
         )
 
         geocoded_csv = output_dir / f"{input_path.stem}_validi_geocoded.csv"
+        geocoded_all_csv = output_dir / f"{input_path.stem}_validi_geocoded_all.csv"
         cache_path = output_dir / "nominatim_cache.json"
         geocode_started = now_ts()
 
@@ -229,18 +230,20 @@ def process_job(job_id: str) -> None:
         )
         geocode = geocode_csv_dedup_by_address(
             analysis["paths"]["validi"],
-            geocoded_csv,
+            geocoded_all_csv,
             cache_path=cache_path,
             email=email,
             user_agent="PuliziaDatiSinergia-Web/1.0 (+local-webapp)",
             dry_run=dry_run,
             progress_callback=progress_callback,
         )
-        da_verificare = build_da_verificare_from_geocoded(
+        split = split_geocoded_results(
+            geocoded_all_csv,
             geocoded_csv,
             analysis["paths"]["da_verificare"],
         )
-        analysis_counts["da_verificare"] = da_verificare["rows"]
+        geocoded_all_csv.unlink(missing_ok=True)
+        analysis_counts["da_verificare"] = split["da_verificare_rows"]
 
         update_job(
             job_id,

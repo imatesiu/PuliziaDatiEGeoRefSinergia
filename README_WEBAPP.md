@@ -87,13 +87,13 @@ Nota importante:
 ### Build immagine
 
 ```bash
-docker build -t pulizia-dati-sinergia:1.3.5 .
+docker build -t pulizia-dati-sinergia:1.3.6 .
 ```
 
 ### Avvio container
 
 ```bash
-docker run --rm -p 9382:8443 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.3.5
+docker run --rm -p 9382:8443 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.3.6
 ```
 
 Poi apri nel browser:
@@ -151,7 +151,7 @@ La versione corrente è definita in:
 Valori attuali:
 
 - `APP_NAME = "Pulizia Dati Sinergia"`
-- `APP_VERSION = "1.3.5"`
+- `APP_VERSION = "1.3.6"`
 
 ## Regola di manutenzione
 
@@ -172,6 +172,7 @@ Questo serve a mantenere coerenti:
 - In caso di `HTTP 429` da Nominatim, il geocoder applica un backoff piu conservativo prima di riprovare.
 - Il CSV geocodificato include anche `GEOCODER_STRATEGY` e `GEOCODER_NOTE`, cosi e visibile se il match e stato ottenuto senza numero civico o con fallback alternativi.
 - I duplicati restano in `validi` e `validi_geocoded`: il geocoder deduplica per indirizzo normalizzato, cerca una sola volta e poi riusa il risultato sulle righe uguali.
+- `validi_geocoded` contiene solo i record con coordinate trovate.
 - `da_verificare` contiene solo i record che, dopo il geocoding, restano senza coordinate.
 - La home mostra lo stato del job, la percentuale di avanzamento e una stima del tempo rimanente fino alla generazione dello ZIP.
 - Per il geocoding reale è consigliato inserire un'email nel form.
