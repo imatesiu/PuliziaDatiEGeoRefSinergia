@@ -35,6 +35,7 @@ Lo ZIP di output contiene:
 - `*_da_verificare.csv`
 - `*_scarti.csv`
 - `*_validi_geocoded.csv`
+- `*_without_duplicaded.csv`
 - `job_manifest.json`
 - `nominatim_cache.json`
 
@@ -87,13 +88,13 @@ Nota importante:
 ### Build immagine
 
 ```bash
-docker build -t pulizia-dati-sinergia:1.3.7 .
+docker build -t pulizia-dati-sinergia:1.3.9 .
 ```
 
 ### Avvio container
 
 ```bash
-docker run --rm -p 9382:8443 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.3.7
+docker run --rm -p 9382:8443 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.3.9
 ```
 
 Poi apri nel browser:
@@ -151,7 +152,7 @@ La versione corrente è definita in:
 Valori attuali:
 
 - `APP_NAME = "Pulizia Dati Sinergia"`
-- `APP_VERSION = "1.3.7"`
+- `APP_VERSION = "1.3.9"`
 
 ## Regola di manutenzione
 
@@ -173,6 +174,7 @@ Questo serve a mantenere coerenti:
 - Il CSV geocodificato include anche `GEOCODER_STRATEGY` e `GEOCODER_NOTE`, cosi e visibile se il match e stato ottenuto senza numero civico o con fallback alternativi.
 - I duplicati restano in `validi` e `validi_geocoded`: il geocoder deduplica per indirizzo normalizzato, cerca una sola volta e poi riusa il risultato sulle righe uguali.
 - `validi_geocoded` contiene solo i record con coordinate trovate.
+- `without_duplicaded` contiene solo i record geocodificati e senza duplicati: una sola riga per ogni indirizzo normalizzato.
 - `da_verificare` contiene solo i record che, dopo il geocoding, restano senza coordinate.
 - La web app usa uno storico cache persistente in `cache/nominatim_cache.json`, cosi i run successivi possono riusare i risultati gia trovati senza rifare le stesse richieste.
 - La home mostra lo stato del job, la percentuale di avanzamento e una stima del tempo rimanente fino alla generazione dello ZIP.

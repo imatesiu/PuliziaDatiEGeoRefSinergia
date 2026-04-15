@@ -815,6 +815,25 @@ def split_geocoded_results(
     }
 
 
+def build_without_duplicaded_csv(
+    matched_csv: Path,
+    without_duplicaded_csv: Path,
+) -> dict[str, Any]:
+    fieldnames, rows = read_csv_rows(matched_csv)
+    deduped: dict[str, dict[str, str]] = {}
+    for row in rows:
+        key = normalized_address_key(row.get("INDIRIZZO NORMALIZZATO", ""))
+        if key and key not in deduped:
+            deduped[key] = row
+    deduped_rows = list(deduped.values())
+    write_rows_with_headers(without_duplicaded_csv, deduped_rows, fieldnames)
+    return {
+        "rows": len(deduped_rows),
+        "path": without_duplicaded_csv,
+        "fieldnames": fieldnames,
+    }
+
+
 def geocode_csv(
     input_csv: Path,
     output_csv: Path,
@@ -992,12 +1011,19 @@ def run_full_pipeline(
         geocoded_csv,
         analysis["paths"]["da_verificare"],
     )
+    without_duplicaded_csv = output_dir / f"{stem}_without_duplicaded.csv"
+    without_duplicaded = build_without_duplicaded_csv(
+        geocoded_csv,
+        without_duplicaded_csv,
+    )
     geocoded_all_csv.unlink(missing_ok=True)
 
     analysis["paths"]["validi_geocoded"] = geocoded_csv
+    analysis["paths"]["without_duplicaded"] = without_duplicaded_csv
     analysis["paths"]["cache"] = cache_path
     analysis["geocode"] = geocode
     analysis["da_verificare"] = split
+    analysis["without_duplicaded"] = without_duplicaded
     return analysis
 
 

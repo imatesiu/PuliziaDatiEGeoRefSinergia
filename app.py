@@ -18,6 +18,7 @@ from werkzeug.utils import secure_filename
 from app_version import APP_NAME, APP_VERSION
 from georef_pipeline import (
     analyze_input_file,
+    build_without_duplicaded_csv,
     copy_input_to_output,
     geocode_csv_dedup_by_address,
     split_geocoded_results,
@@ -248,6 +249,11 @@ def process_job(job_id: str) -> None:
             geocoded_all_csv,
             geocoded_csv,
             analysis["paths"]["da_verificare"],
+        )
+        without_duplicaded_csv = output_dir / f"{input_path.stem}_without_duplicaded.csv"
+        build_without_duplicaded_csv(
+            geocoded_csv,
+            without_duplicaded_csv,
         )
         geocoded_all_csv.unlink(missing_ok=True)
         if cache_path.exists():
