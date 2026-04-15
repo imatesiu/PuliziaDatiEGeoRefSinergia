@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
 import threading
 import time
@@ -28,9 +29,13 @@ ANALYSIS_WEIGHT = 0.14
 GEOCODING_WEIGHT = 0.81
 PACKAGING_WEIGHT = 0.05
 JOB_TTL_SECONDS = 60 * 60
+APP_ROOT = Path(__file__).resolve().parent
+SHARED_CACHE_DIR = Path(os.getenv("GEOCODER_CACHE_DIR", APP_ROOT / "cache"))
+SHARED_CACHE_FILE = SHARED_CACHE_DIR / "nominatim_cache.json"
 
 app = Flask(__name__)
 jobs_lock = threading.Lock()
+geocoding_lock = threading.Lock()
 jobs: dict[str, dict[str, Any]] = {}
 
 
@@ -191,7 +196,7 @@ def process_job(job_id: str) -> None:
 
         geocoded_csv = output_dir / f"{input_path.stem}_validi_geocoded.csv"
         geocoded_all_csv = output_dir / f"{input_path.stem}_validi_geocoded_all.csv"
-        cache_path = output_dir / "nominatim_cache.json"
+        cache_path = SHARED_CACHE_FILE
         geocode_started = now_ts()
 
         def progress_callback(current: int, total: int, address: str, status: str) -> None:
@@ -228,21 +233,25 @@ def process_job(job_id: str) -> None:
             message="Geocodifica degli indirizzi validi in corso",
             eta_seconds=None,
         )
-        geocode = geocode_csv_dedup_by_address(
-            analysis["paths"]["validi"],
-            geocoded_all_csv,
-            cache_path=cache_path,
-            email=email,
-            user_agent="PuliziaDatiSinergia-Web/1.0 (+local-webapp)",
-            dry_run=dry_run,
-            progress_callback=progress_callback,
-        )
+        SHARED_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        with geocoding_lock:
+            geocode = geocode_csv_dedup_by_address(
+                analysis["paths"]["validi"],
+                geocoded_all_csv,
+                cache_path=cache_path,
+                email=email,
+                user_agent="PuliziaDatiSinergia-Web/1.0 (+local-webapp)",
+                dry_run=dry_run,
+                progress_callback=progress_callback,
+            )
         split = split_geocoded_results(
             geocoded_all_csv,
             geocoded_csv,
             analysis["paths"]["da_verificare"],
         )
         geocoded_all_csv.unlink(missing_ok=True)
+        if cache_path.exists():
+            shutil.copy2(cache_path, output_dir / "nominatim_cache.json")
         analysis_counts["da_verificare"] = split["da_verificare_rows"]
 
         update_job(

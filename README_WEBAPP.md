@@ -87,13 +87,13 @@ Nota importante:
 ### Build immagine
 
 ```bash
-docker build -t pulizia-dati-sinergia:1.3.6 .
+docker build -t pulizia-dati-sinergia:1.3.7 .
 ```
 
 ### Avvio container
 
 ```bash
-docker run --rm -p 9382:8443 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.3.6
+docker run --rm -p 9382:8443 --name pulizia-dati-sinergia pulizia-dati-sinergia:1.3.7
 ```
 
 Poi apri nel browser:
@@ -151,7 +151,7 @@ La versione corrente è definita in:
 Valori attuali:
 
 - `APP_NAME = "Pulizia Dati Sinergia"`
-- `APP_VERSION = "1.3.6"`
+- `APP_VERSION = "1.3.7"`
 
 ## Regola di manutenzione
 
@@ -174,6 +174,7 @@ Questo serve a mantenere coerenti:
 - I duplicati restano in `validi` e `validi_geocoded`: il geocoder deduplica per indirizzo normalizzato, cerca una sola volta e poi riusa il risultato sulle righe uguali.
 - `validi_geocoded` contiene solo i record con coordinate trovate.
 - `da_verificare` contiene solo i record che, dopo il geocoding, restano senza coordinate.
+- La web app usa uno storico cache persistente in `cache/nominatim_cache.json`, cosi i run successivi possono riusare i risultati gia trovati senza rifare le stesse richieste.
 - La home mostra lo stato del job, la percentuale di avanzamento e una stima del tempo rimanente fino alla generazione dello ZIP.
 - Per il geocoding reale è consigliato inserire un'email nel form.
 - È disponibile anche la modalità `dry run`, che genera gli output senza chiamare il geocoder.

@@ -10,4 +10,7 @@ services:
       TLS_ENABLED: "true"
       TLS_CERT_FILE: /app/tls/fullchain.pem
       TLS_KEY_FILE: /app/tls/privkey.pem
+      GEOCODER_CACHE_DIR: /app/cache
+    volumes:
+      - ./cache:/app/cache
     restart: unless-stopped
